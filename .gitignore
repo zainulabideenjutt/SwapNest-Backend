@@ -38,3 +38,4 @@ staticfiles/
 # Migrations (optional: keep if needed)
 **/migrations/*.py
 !**/migrations/__init__.py
+
