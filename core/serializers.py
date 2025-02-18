@@ -20,8 +20,8 @@ from .models import (
 class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
-        fields = ['image_id', 'product', 'image_url', 'caption', 'order', 'created_at']
-        read_only_fields = ['image_id', 'created_at']
+        fields = ['id', 'product', 'image_url', 'caption', 'order', 'created_at']
+        read_only_fields = ['id', 'created_at']
 
     def validate_order(self, value):
         if value < 0:
@@ -35,20 +35,21 @@ class ProductImageSerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     seller = serializers.StringRelatedField(read_only=True)
+    # For input, expect the category's PK; for output, include its name.
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(), write_only=True, source='category'
     )
-    category_name = serializers.CharField(source='category.category_name', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
     bought_by = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = Product
         fields = [
-            'product_id', 'seller', 'title', 'description', 'price',
-            'condition', 'listing_date', 'location', 'category_id', 'category_name',
+            'id', 'seller', 'title', 'description', 'price',
+            'condition', 'location', 'category_id', 'category_name',
             'is_active', 'is_sold', 'bought_by', 'created_at', 'updated_at', 'images'
         ]
-        read_only_fields = ['product_id', 'seller', 'listing_date', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'seller', 'created_at', 'updated_at']
 
     def validate_price(self, value):
         if value <= 0:
@@ -63,11 +64,11 @@ class ReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
         fields = [
-            'report_id', 'reporter', 'reported_product', 'reported_user',
-            'reason', 'description', 'report_date', 'status',
+            'id', 'reporter', 'reported_product', 'reported_user',
+            'reason', 'description', 'created_at', 'status',
             'reviewed_by', 'reviewed_at'
         ]
-        read_only_fields = ['report_id', 'reporter', 'report_date']
+        read_only_fields = ['id', 'reporter', 'created_at']
 
     def validate(self, data):
         # Ensure that at least one of reported_product or reported_user is provided.
@@ -83,7 +84,7 @@ class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
     listings = ProductSerializer(many=True, read_only=True, source='products')
     purchased_products = ProductSerializer(many=True, read_only=True)
-    reports = ReportSerializer(many=True, read_only=True)  # Include filed reports
+    reports = ReportSerializer(many=True, read_only=True)  # Reports filed by the user
 
     class Meta:
         model = User
@@ -120,8 +121,8 @@ class UserSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['category_id', 'category_name', 'description', 'created_at', 'updated_at']
-        read_only_fields = ['category_id', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'description', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 # ---------------------------------------------------
@@ -131,11 +132,11 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = [
-            'transaction_id', 'product', 'buyer', 'seller',
-            'transaction_date', 'payment_method', 'amount',
+            'id', 'product', 'buyer', 'seller',
+            'payment_method', 'amount',
             'transaction_status', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['transaction_id', 'transaction_date', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
     def validate_amount(self, value):
         if value <= 0:
@@ -162,18 +163,18 @@ class ConversationSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = ['message_id', 'conversation', 'sender', 'message_content', 'sent_timestamp', 'read_status']
-        read_only_fields = ['message_id', 'sender', 'sent_timestamp', 'read_status']
+        fields = ['id', 'conversation', 'sender', 'content', 'created_at', 'read_status']
+        read_only_fields = ['id', 'sender', 'created_at', 'read_status']
 
-    def validate_message_content(self, value):
+    def validate_content(self, value):
         if not value.strip():
             raise serializers.ValidationError("Message content cannot be empty.")
         return value
 
 
-# -------------------------------
-# Cart Serializers
-# -------------------------------
+# ---------------------------------------------------
+# CartItem Serializer
+# ---------------------------------------------------
 class CartItemSerializer(serializers.ModelSerializer):
     # For output: nested full product representation.
     product = ProductSerializer(read_only=True)
@@ -184,7 +185,8 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CartItem
-        fields = ['id', 'product', 'product_id', 'quantity', 'added_at']
+        fields = ['id', 'product', 'product_id', 'quantity', 'created_at']
+        read_only_fields = ['id', 'product', 'created_at']
 
     def validate_product(self, value):
         if value.is_sold:
@@ -197,6 +199,9 @@ class CartItemSerializer(serializers.ModelSerializer):
         return value
 
 
+# ---------------------------------------------------
+# Cart Serializer
+# ---------------------------------------------------
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(many=True, read_only=True)
     
@@ -206,17 +211,20 @@ class CartSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'user', 'items', 'created_at', 'updated_at']
 
 
-# -------------------------------
-# Order Serializers
-# -------------------------------
+# ---------------------------------------------------
+# OrderItem Serializer
+# ---------------------------------------------------
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)  # Nested full product details
 
     class Meta:
         model = OrderItem
         fields = ['id', 'product', 'quantity', 'price']
-        
 
+
+# ---------------------------------------------------
+# Order Serializer
+# ---------------------------------------------------
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     

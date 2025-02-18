@@ -34,47 +34,48 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = []
     serializer_class = UserSerializer
 
+
 class CustomTokenRefreshView(TokenRefreshView):
     def post(self, request, *args, **kwargs) -> Response:
         try:
             refresh_token = request.COOKIES.get('refresh_token')
             request.data['refresh'] = refresh_token
-            response=super().post(request, *args, **kwargs)
-            tokens=response.data
+            response = super().post(request, *args, **kwargs)
+            tokens = response.data
             access_token = tokens['access']
             refresh_token = tokens['refresh']
 
             res = Response()
-
-            res.data = {'refeshed':True}
+            res.data = {'refreshed': True}
             res.set_cookie(
-                    key='access_token',
-                    value=access_token,
-                    httponly=True,
-                    secure=True,
-                    samesite='None',
-                    path='/'
-                )
+                key='access_token',
+                value=access_token,
+                httponly=True,
+                secure=True,
+                samesite='None',
+                path='/'
+            )
             res.set_cookie(
-                    key='refresh_token',
-                    value=refresh_token,
-                    httponly=True,
-                    secure=True,
-                    samesite='None',
-                    path='/'
-                )
-            res.data.update({'access_token':access_token,'refresh_token':refresh_token})
+                key='refresh_token',
+                value=refresh_token,
+                httponly=True,
+                secure=True,
+                samesite='None',
+                path='/'
+            )
+            res.data.update({'access_token': access_token, 'refresh_token': refresh_token})
             return res
         except Exception as e:
-            return Response({'refreshed':False, "error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'refreshed': False, "error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
 
 class LoginView(APIView):
     """
     Authenticate user credentials and issue JWT tokens.
     
     Endpoints:
-    - POST: Accepts username and password, returns JWT tokens if valid
-    - Sets httponly cookie with access token for enhanced security
+    - POST: Accepts email and password, returns JWT tokens if valid.
+    - Sets httponly cookie with access token for enhanced security.
     """
     permission_classes = []
     
@@ -89,7 +90,7 @@ class LoginView(APIView):
         user = authenticate(email=email, password=password)
         if user is None:
             return Response(
-                {"error": "Authentication Failed", "detail": "Incorrect Email or password. Please try again."},
+                {"error": "Authentication Failed", "detail": "Incorrect email or password. Please try again."},
                 status=status.HTTP_401_UNAUTHORIZED
             )
         if not user.is_active:
@@ -105,16 +106,18 @@ class LoginView(APIView):
             "refresh_token": str(refresh),
             "user": UserSerializer(user).data,
         }, status=status.HTTP_200_OK)
-        response.set_cookie(key='access_token', value=access_token, httponly=True)
-        response.set_cookie(key='refresh_token', value=str(refresh), httponly=True)
+        response.set_cookie(key='access_token', value=access_token, httponly=True,secure=True,samesite='None',
+                path='/')
+        response.set_cookie(key='refresh_token', value=str(refresh), httponly=True ,secure=True,samesite='None')
         return response
+
 
 class LogoutView(APIView):
     """
     Log out the user by clearing the JWT cookie.
     
     Endpoints:
-    - POST: Clears the access token cookie and logs out the user
+    - POST: Clears the access token cookie and logs out the user.
     """
     permission_classes = [IsAuthenticated]
     
@@ -124,9 +127,9 @@ class LogoutView(APIView):
             status=status.HTTP_200_OK
         )
         response.delete_cookie('access_token')
-        response.delete_cookie('refresh_token')        
-
+        response.delete_cookie('refresh_token')
         return response
+
 
 class PasswordResetView(APIView):
     """Dummy password reset endpoint."""
@@ -145,6 +148,7 @@ class PasswordResetView(APIView):
             status=status.HTTP_200_OK
         )
 
+
 class ProfileView(generics.RetrieveUpdateAPIView):
     """Retrieve or update the current user's profile."""
     permission_classes = [IsAuthenticated]
@@ -152,6 +156,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
 
 # ---------------------------------------------------
 # Product & Category Related Views
@@ -161,16 +166,16 @@ class ProductViewSet(viewsets.ModelViewSet):
     CRUD operations for products.
     
     Features:
-    - Filters products by title, category, price range, location, and condition
-    - Excludes sold products and user's own listings (except for admins)
-    - Only owners and admins can update/delete products
-    - Soft deletion by setting is_active=False
+    - Filters products by title, category, price range, location, and condition.
+    - Excludes sold products and user's own listings (except for admins).
+    - Only owners and admins can update/delete products.
+    - Soft deletion by setting is_active=False.
     
     Endpoints:
-    - GET: List products with optional filters
-    - POST: Create new product
-    - PUT/PATCH: Update product (owner/admin only)
-    - DELETE: Soft delete product (owner/admin only)
+    - GET: List products with optional filters.
+    - POST: Create new product.
+    - PUT/PATCH: Update product (owner/admin only).
+    - DELETE: Soft delete product (owner/admin only).
     """
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated]
@@ -186,7 +191,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         if title:
             queryset = queryset.filter(title__icontains=title)
         if category:
-            queryset = queryset.filter(category__category_name__iexact=category)
+            queryset = queryset.filter(category__name__iexact=category)
         if min_price:
             queryset = queryset.filter(price__gte=min_price)
         if max_price:
@@ -225,6 +230,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             status=status.HTTP_204_NO_CONTENT
         )
 
+
 class ProductImageViewSet(viewsets.ModelViewSet):
     """
     CRUD for product images.
@@ -242,6 +248,7 @@ class ProductImageViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You are only allowed to add images to your own products.")
         serializer.save()
 
+
 class CategoryViewSet(viewsets.ModelViewSet):
     """
     CRUD for categories.
@@ -249,6 +256,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
     permission_classes = [IsAuthenticated]
     queryset = Category.objects.all()
+
 
 # ---------------------------------------------------
 # Transaction Related ViewSet
@@ -258,13 +266,13 @@ class TransactionViewSet(viewsets.ModelViewSet):
     Manage buying and selling transactions.
     
     Features:
-    - Users can view their transactions as buyer or seller
-    - Admins can view all transactions
-    - Automatically records transaction details during checkout
+    - Users can view their transactions as buyer or seller.
+    - Admins can view all transactions.
+    - Automatically records transaction details during checkout.
     
     Endpoints:
-    - GET: List user's transactions
-    - POST: Create new transaction (usually via checkout)
+    - GET: List user's transactions.
+    - POST: Create new transaction (usually via checkout).
     """
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated]
@@ -294,6 +302,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         response_data.update(serializer.data)
         return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
 
+
 # ---------------------------------------------------
 # Report Related ViewSet
 # ---------------------------------------------------
@@ -322,6 +331,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             )
         return super().update(request, *args, **kwargs)
 
+
 # ---------------------------------------------------
 # Conversation & Message (Chat) Related ViewSets
 # ---------------------------------------------------
@@ -348,6 +358,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         }
         return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
 
+
 class MessageViewSet(viewsets.ModelViewSet):
     """
     Manage messages within a conversation.
@@ -373,6 +384,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         }
         return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
 
+
 # ---------------------------------------------------
 # Cart & Order Related ViewSets
 # ---------------------------------------------------
@@ -381,14 +393,14 @@ class CartItemViewSet(viewsets.ModelViewSet):
     Manage shopping cart items.
     
     Features:
-    - Automatically creates cart for new users
-    - Prevents duplicate products in cart
-    - Associates items with user's cart
+    - Automatically creates cart for new users.
+    - Prevents duplicate products in cart.
+    - Associates items with user's cart.
     
     Endpoints:
-    - GET: List cart items
-    - POST: Add item to cart
-    - DELETE: Remove item from cart
+    - GET: List cart items.
+    - POST: Add item to cart.
+    - DELETE: Remove item from cart.
     """
     serializer_class = CartItemSerializer
     permission_classes = [IsAuthenticated]
@@ -405,8 +417,8 @@ class CartItemViewSet(viewsets.ModelViewSet):
                 {"error": "Bad Request", "detail": "Product ID is required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        # Use product__product_id because the Product model uses product_id as primary key.
-        if cart.items.filter(product__product_id=product_id).exists():
+        # Check for duplicate items using the improved Product model's primary key field: id.
+        if cart.items.filter(product__id=product_id).exists():
             return Response(
                 {"error": "Duplicate Item", "detail": "This product is already in your cart."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -416,6 +428,7 @@ class CartItemViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         cart, _ = Cart.objects.get_or_create(user=self.request.user)
         serializer.save(cart=cart)
+
 
 class EmptyCartView(APIView):
     """
@@ -430,6 +443,7 @@ class EmptyCartView(APIView):
             {"detail": "Your cart has been emptied successfully."},
             status=status.HTTP_204_NO_CONTENT
         )
+
 
 class OrderViewSet(viewsets.ModelViewSet):
     """
@@ -477,28 +491,29 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
         return super().destroy(request, *args, **kwargs)
 
+
 class CheckoutView(APIView):
     """
     Process checkout from shopping cart.
     
     Features:
-    - Validates sufficient balance
-    - Creates order and transactions
-    - Updates user balances
-    - Marks products as sold
-    - Clears cart after successful checkout
+    - Validates sufficient balance.
+    - Creates order and transactions.
+    - Updates user balances.
+    - Marks products as sold.
+    - Clears cart after successful checkout.
     
     Process flow:
-    1. Validate cart contents and user balance
-    2. Create order record
-    3. Process payments
-    4. Create transactions
-    5. Update product status
-    6. Clear cart
+    1. Validate cart contents and user balance.
+    2. Create order record.
+    3. Process payments.
+    4. Create transactions.
+    5. Update product status.
+    6. Clear cart.
     
     Security:
-    - Prevents self-purchase of products
-    - Uses atomic transactions for data consistency
+    - Prevents self-purchase of products.
+    - Uses atomic transactions for data consistency.
     """
     permission_classes = [IsAuthenticated]
     
@@ -570,6 +585,7 @@ class CheckoutView(APIView):
                 status=status.HTTP_201_CREATED
             )
 
+
 # ---------------------------------------------------
 # Admin Dashboard Related ViewSets
 # ---------------------------------------------------
@@ -578,35 +594,37 @@ class AdminUserViewSet(viewsets.ModelViewSet):
     Admin-only endpoints for user management.
     
     Features:
-    - Full CRUD access to user accounts
-    - Restricted to admin users only
-    - Manages user roles and permissions
+    - Full CRUD access to user accounts.
+    - Restricted to admin users only.
+    - Manages user roles and permissions.
     """
     serializer_class = UserSerializer
     permission_classes = [IsAdminUser]
     queryset = User.objects.all()
+
 
 class AdminProductViewSet(viewsets.ModelViewSet):
     """
     Admin-only endpoints for product management.
     
     Features:
-    - Override user restrictions
-    - Access to all products including inactive
-    - Can modify any product regardless of owner
+    - Override user restrictions.
+    - Access to all products including inactive.
+    - Can modify any product regardless of owner.
     """
     serializer_class = ProductSerializer
     permission_classes = [IsAdminUser]
     queryset = Product.objects.all()
+
 
 class AdminReportViewSet(viewsets.ModelViewSet):
     """
     Admin-only endpoints for report management.
     
     Features:
-    - Access to all user reports
-    - Can update report status
-    - Manage dispute resolution
+    - Access to all user reports.
+    - Can update report status.
+    - Manage dispute resolution.
     """
     serializer_class = ReportSerializer
     permission_classes = [IsAdminUser]

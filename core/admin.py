@@ -12,13 +12,15 @@ class CustomUserAdmin(BaseUserAdmin):
     list_filter = ('role', 'is_active',)
     search_fields = ('username', 'email')
     ordering = ('-created_at',)
+    
+    # Remove non-editable fields from fieldsets.
     fieldsets = (
         (None, {'fields': ('username', 'email', 'password')}),
         ('Personal Info', {'fields': ('profile_picture_url', 'contact_details')}),
         ('Permissions', {
             'fields': ('role', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')
         }),
-        ('Important dates', {'fields': ('last_login', 'created_at', 'updated_at')}),
+        ('Important dates', {'fields': ('last_login',)}),
         ('Financial', {'fields': ('balance',)}),
     )
     add_fieldsets = (
@@ -27,23 +29,23 @@ class CustomUserAdmin(BaseUserAdmin):
             'fields': ('username', 'email', 'password1', 'password2', 'role', 'balance', 'is_active', 'is_staff'),
         }),
     )
+    # Mark non-editable fields as read-only so they can be displayed.
+    readonly_fields = ('created_at', 'updated_at')
 
-# Register the custom User model with the custom admin.
 admin.site.register(User, CustomUserAdmin)
 
-# Register remaining models with default ModelAdmin.
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('category_name', 'description', 'created_at')
-    search_fields = ('category_name',)
-    ordering = ('category_name',)
+    list_display = ('name', 'description', 'created_at')
+    search_fields = ('name',)
+    ordering = ('name',)
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('title', 'seller', 'price', 'condition', 'is_active', 'is_sold', 'listing_date')
+    list_display = ('title', 'seller', 'price', 'condition', 'is_active', 'is_sold', 'created_at')
     list_filter = ('condition', 'is_active', 'is_sold', 'category')
     search_fields = ('title', 'description', 'seller__username')
-    ordering = ('-listing_date',)
+    ordering = ('-created_at',)
     
 @admin.register(ProductImage)
 class ProductImageAdmin(admin.ModelAdmin):
@@ -53,17 +55,17 @@ class ProductImageAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ('transaction_id', 'product', 'buyer', 'seller', 'amount', 'transaction_status', 'transaction_date')
+    list_display = ('id', 'product', 'buyer', 'seller', 'amount', 'transaction_status', 'created_at')
     list_filter = ('transaction_status', 'payment_method')
     search_fields = ('product__title', 'buyer__username', 'seller__username')
-    ordering = ('-transaction_date',)
+    ordering = ('-created_at',)
 
 @admin.register(Report)
 class ReportAdmin(admin.ModelAdmin):
-    list_display = ('report_id', 'reporter', 'reason', 'status', 'report_date')
+    list_display = ('id', 'reporter', 'reason', 'status', 'created_at')
     list_filter = ('status',)
     search_fields = ('reporter__username', 'reason')
-    ordering = ('-report_date',)
+    ordering = ('-created_at',)
 
 @admin.register(Conversation)
 class ConversationAdmin(admin.ModelAdmin):
@@ -74,10 +76,10 @@ class ConversationAdmin(admin.ModelAdmin):
 
 @admin.register(Message)
 class MessageAdmin(admin.ModelAdmin):
-    list_display = ('message_id', 'sender', 'conversation', 'sent_timestamp')
-    list_filter = ('sent_timestamp', 'read_status')
+    list_display = ('id', 'sender', 'conversation', 'created_at')
+    list_filter = ('read_status', 'created_at')
     search_fields = ('sender__username', 'conversation__id')
-    ordering = ('sent_timestamp',)
+    ordering = ('created_at',)
 
 @admin.register(Cart)
 class CartAdmin(admin.ModelAdmin):
@@ -87,9 +89,9 @@ class CartAdmin(admin.ModelAdmin):
 
 @admin.register(CartItem)
 class CartItemAdmin(admin.ModelAdmin):
-    list_display = ('id', 'cart', 'product', 'quantity', 'added_at')
+    list_display = ('id', 'cart', 'product', 'quantity', 'created_at')
     search_fields = ('cart__user__username', 'product__title')
-    ordering = ('-added_at',)
+    ordering = ('-created_at',)
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):

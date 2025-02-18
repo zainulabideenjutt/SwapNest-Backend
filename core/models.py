@@ -35,6 +35,29 @@ REPORT_STATUS_CHOICES = [
     ('Resolved', 'Resolved'),
 ]
 
+ORDER_STATUS_CHOICES = [
+    ('Pending', 'Pending'),
+    ('Processing', 'Processing'),
+    ('Completed', 'Completed'),
+    ('Cancelled', 'Cancelled'),
+]
+
+
+# ---------------------------------------------------
+# Abstract Base Model for UUID Primary Key and Timestamps
+# ---------------------------------------------------
+class UUIDTimeStampedModel(models.Model):
+    """
+    Abstract base model that provides a UUID primary key, created_at, and updated_at fields.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True, help_text="The time when the record was created.")
+    updated_at = models.DateTimeField(auto_now=True, help_text="The time when the record was last updated.")
+
+    class Meta:
+        abstract = True
+
+
 # ---------------------------------------------------
 # Custom User Manager
 # ---------------------------------------------------
@@ -60,6 +83,7 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('role', 'Admin')
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
+
         if extra_fields.get('role') != 'Admin':
             raise ValueError('Superuser must have role of Admin.')
         if not extra_fields.get('is_staff'):
@@ -68,14 +92,14 @@ class UserManager(BaseUserManager):
             raise ValueError('Superuser must have is_superuser=True.')
         return self.create_user(username, email, password, **extra_fields)
 
+
 # ---------------------------------------------------
 # Custom User Model
 # ---------------------------------------------------
-class User(AbstractBaseUser, PermissionsMixin):
+class User(AbstractBaseUser, PermissionsMixin, UUIDTimeStampedModel):
     """
-    Custom User model for Buy and Sell Pre-owned Items.
+    Custom User model for the Buy and Sell Pre-owned Items web application.
     """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     username = models.CharField(
         max_length=150,
         unique=True,
@@ -91,8 +115,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         max_digits=10, decimal_places=2, default=Decimal('1000.00'),
         help_text="User's wallet balance. Defaults to 1000.00."
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     objects = UserManager()
 
@@ -109,37 +131,33 @@ class User(AbstractBaseUser, PermissionsMixin):
 # ---------------------------------------------------
 # Category Model
 # ---------------------------------------------------
-class Category(models.Model):
+class Category(UUIDTimeStampedModel):
     """
-    Model representing a product category.
+    Represents a product category (e.g., Electronics, Furniture, Clothing).
     """
-    category_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    category_name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100, unique=True, help_text="Unique category name.")
     description = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.category_name
+        return self.name
 
     class Meta:
-        ordering = ['category_name']
+        ordering = ['name']
+        verbose_name_plural = "Categories"
 
 
 # ---------------------------------------------------
 # Product Model
 # ---------------------------------------------------
-class Product(models.Model):
+class Product(UUIDTimeStampedModel):
     """
-    Model representing a product listing.
+    Represents a product listing uploaded by a seller.
     """
-    product_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='products')
     title = models.CharField(max_length=255)
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     condition = models.CharField(max_length=20, choices=CONDITION_CHOICES)
-    listing_date = models.DateTimeField(auto_now_add=True)
     location = models.CharField(max_length=255, blank=True, null=True)
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     is_active = models.BooleanField(default=True)
@@ -147,32 +165,28 @@ class Product(models.Model):
     bought_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='purchased_products'
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title
 
     class Meta:
-        ordering = ['-listing_date']
+        ordering = ['-created_at']
 
 
 # ---------------------------------------------------
 # Product Image Model
 # ---------------------------------------------------
-class ProductImage(models.Model):
+class ProductImage(UUIDTimeStampedModel):
     """
-    Model representing images associated with a product.
+    Represents an image associated with a product listing.
     """
-    image_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
-    image_url = models.URLField()
+    image_url = models.URLField(max_length=1000)
     caption = models.CharField(max_length=255, blank=True, null=True)
-    order = models.PositiveIntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
+    order = models.PositiveIntegerField(default=0, help_text="Determines the display order of images.")
 
     def __str__(self):
-        return f"Image for {self.product.title} ({self.order})"
+        return f"Image for {self.product.title} (Order: {self.order})"
 
     class Meta:
         ordering = ['order']
@@ -181,36 +195,31 @@ class ProductImage(models.Model):
 # ---------------------------------------------------
 # Transaction Model
 # ---------------------------------------------------
-class Transaction(models.Model):
+class Transaction(UUIDTimeStampedModel):
     """
-    Model recording a product sale transaction.
+    Records a product sale transaction.
     """
-    transaction_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='transaction')
     buyer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='purchases')
     seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sales')
-    transaction_date = models.DateTimeField(auto_now_add=True)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     transaction_status = models.CharField(max_length=20, choices=TRANSACTION_STATUS_CHOICES, default='Pending')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Transaction {self.transaction_id} for {self.product.title}"
+        return f"Transaction {self.id} for {self.product.title}"
 
     class Meta:
-        ordering = ['-transaction_date']
+        ordering = ['-created_at']
 
 
 # ---------------------------------------------------
 # Report Model
 # ---------------------------------------------------
-class Report(models.Model):
+class Report(UUIDTimeStampedModel):
     """
-    Model representing a user report.
+    Represents a user report regarding a product or another user.
     """
-    report_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports')
     reported_product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name='reports', blank=True, null=True
@@ -220,7 +229,6 @@ class Report(models.Model):
     )
     reason = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    report_date = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=REPORT_STATUS_CHOICES, default='Pending')
     reviewed_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, related_name='reviewed_reports', blank=True, null=True
@@ -228,31 +236,26 @@ class Report(models.Model):
     reviewed_at = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
-        return f"Report {self.report_id} by {self.reporter.username}"
+        return f"Report {self.id} by {self.reporter.username}"
 
     class Meta:
-        ordering = ['-report_date']
+        ordering = ['-created_at']
 
 
 # ---------------------------------------------------
 # Conversation Model (for Chat)
 # ---------------------------------------------------
-class Conversation(models.Model):
+class Conversation(UUIDTimeStampedModel):
     """
-    Model grouping messages between users, optionally linked to a product.
+    Groups messages between users, optionally linked to a specific product.
     """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name='conversations', blank=True, null=True
     )
     participants = models.ManyToManyField(User, related_name='conversations')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
-        if self.product:
-            return f"Conversation for {self.product.title}"
-        return f"Conversation {self.id}"
+        return f"Conversation for {self.product.title}" if self.product else f"Conversation {self.id}"
 
     class Meta:
         ordering = ['-created_at']
@@ -261,37 +264,32 @@ class Conversation(models.Model):
 # ---------------------------------------------------
 # Message Model (Chat)
 # ---------------------------------------------------
-class Message(models.Model):
+class Message(UUIDTimeStampedModel):
     """
-    Model representing a chat message within a conversation.
+    Represents an individual chat message within a conversation.
     """
-    message_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    # Removed null=True, blank=True to enforce that every message belongs to a conversation.
     conversation = models.ForeignKey(
-        Conversation, on_delete=models.CASCADE, related_name='messages',null=True,blank=True
+        Conversation, on_delete=models.CASCADE, related_name='messages'
     )
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
-    message_content = models.TextField()
-    sent_timestamp = models.DateTimeField(auto_now_add=True)
-    read_status = models.BooleanField(default=False)
+    content = models.TextField(help_text="Content of the message.")
+    read_status = models.BooleanField(default=False, help_text="Indicates whether the message has been read.")
 
     def __str__(self):
-        return f"Message from {self.sender.username} at {self.sent_timestamp}"
+        return f"Message from {self.sender.username} at {self.created_at}"
 
     class Meta:
-        ordering = ['sent_timestamp']
+        ordering = ['created_at']
 
 
 # ---------------------------------------------------
 # Cart Model
 # ---------------------------------------------------
-class Cart(models.Model):
+class Cart(UUIDTimeStampedModel):
     """
-    Model representing a user's shopping cart.
+    Represents a user's shopping cart.
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='cart')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Cart({self.user.username})"
@@ -300,14 +298,13 @@ class Cart(models.Model):
 # ---------------------------------------------------
 # CartItem Model
 # ---------------------------------------------------
-class CartItem(models.Model):
+class CartItem(UUIDTimeStampedModel):
     """
-    Model representing an item in a user's cart.
+    Represents an item added to a user's cart.
     """
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='cart_items')
     quantity = models.PositiveIntegerField(default=1)
-    added_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.quantity} x {self.product.title}"
@@ -316,21 +313,13 @@ class CartItem(models.Model):
 # ---------------------------------------------------
 # Order Model
 # ---------------------------------------------------
-class Order(models.Model):
+class Order(UUIDTimeStampedModel):
     """
-    Model representing an order placed by a user.
+    Represents an order placed by a user.
     """
-    ORDER_STATUS_CHOICES = [
-        ('Pending', 'Pending'),
-        ('Processing', 'Processing'),
-        ('Completed', 'Completed'),
-        ('Cancelled', 'Cancelled'),
-    ]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
     status = models.CharField(max_length=20, choices=ORDER_STATUS_CHOICES, default='Pending')
-    total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'), help_text="Total order amount.")
 
     def __str__(self):
         return f"Order {self.id} by {self.user.username}"
@@ -342,14 +331,14 @@ class Order(models.Model):
 # ---------------------------------------------------
 # OrderItem Model
 # ---------------------------------------------------
-class OrderItem(models.Model):
+class OrderItem(UUIDTimeStampedModel):
     """
-    Model representing an individual item within an order.
+    Represents an individual item within an order.
     """
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True)
     quantity = models.PositiveIntegerField(default=1)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Price per item at the time of order.")
 
     def __str__(self):
         product_title = self.product.title if self.product else 'Unknown Product'
