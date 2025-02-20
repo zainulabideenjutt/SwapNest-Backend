@@ -35,19 +35,25 @@ class ProductImageSerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     seller = serializers.StringRelatedField(read_only=True)
-    # For input, expect the category's PK; for output, include its name.
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(), write_only=True, source='category'
     )
     category_name = serializers.CharField(source='category.name', read_only=True)
     bought_by = serializers.StringRelatedField(read_only=True)
+    # Add this field to accept base64 images during creation
+    base64_images = serializers.ListField(
+        child=serializers.CharField(),
+        write_only=True,
+        required=False
+    )
 
     class Meta:
         model = Product
         fields = [
             'id', 'seller', 'title', 'description', 'price',
             'condition', 'location', 'category_id', 'category_name',
-            'is_active', 'is_sold', 'bought_by', 'created_at', 'updated_at', 'images'
+            'is_active', 'is_sold', 'bought_by', 'created_at', 'updated_at', 
+            'images', 'base64_images'  # Add base64_images to fields
         ]
         read_only_fields = ['id', 'seller', 'created_at', 'updated_at']
 

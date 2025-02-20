@@ -20,6 +20,11 @@ from .serializers import (
     ConversationSerializer, MessageSerializer,
     CartItemSerializer, CartSerializer, OrderSerializer
 )
+import base64
+import uuid
+from django.core.files.base import ContentFile
+from django.conf import settings
+import os
 
 # ---------------------------------------------------
 # Authentication Related Views
@@ -204,9 +209,52 @@ class ProductViewSet(viewsets.ModelViewSet):
             queryset = queryset.exclude(seller=self.request.user)
         return queryset
     
-    def perform_create(self, serializer):
-        serializer.save(seller=self.request.user)
-    
+    def create(self, request, *args, **kwargs):
+        # Extract base64 images from request data
+        base64_images = request.data.pop('images', [])
+        
+        # Create the product first
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        product = serializer.save(seller=self.request.user)
+        
+        # Process and save images
+        for index, base64_image in enumerate(base64_images):
+            try:
+                # Extract the base64 data
+                format, imgstr = base64_image.split(';base64,')
+                ext = format.split('/')[-1]
+                
+                # Generate unique filename
+                filename = f"{uuid.uuid4()}.{ext}"
+                
+                # Create the media directory if it doesn't exist
+                media_path = os.path.join(settings.MEDIA_ROOT, 'product_images')
+                os.makedirs(media_path, exist_ok=True)
+                
+                # Save the image file
+                file_path = os.path.join(media_path, filename)
+                with open(file_path, 'wb') as f:
+                    f.write(base64.b64decode(imgstr))
+
+                host_url = request.build_absolute_uri('/')[:-1] 
+                
+                # Create image URL
+                image_url = f"{host_url}{settings.MEDIA_URL}product_images/{filename}"
+                
+                # Create ProductImage instance
+                ProductImage.objects.create(
+                    product=product,
+                    image_url=image_url,
+                    order=index
+                )
+            except Exception as e:
+                # Log the error and continue with the next image
+                print(f"Error processing image: {str(e)}")
+                continue
+        serializer = self.get_serializer(product)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     def update(self, request, *args, **kwargs):
         product = self.get_object()
         if product.seller != request.user and request.user.role != 'Admin':
