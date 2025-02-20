@@ -5,7 +5,7 @@ from .views import (
     ProductViewSet, ProductImageViewSet, CategoryViewSet, TransactionViewSet,
     ReportViewSet, MessageViewSet, AdminUserViewSet, AdminProductViewSet,
     ConversationViewSet,  # Correct viewset registration for conversations
-    AdminReportViewSet, CartItemViewSet, CheckoutView, OrderViewSet,EmptyCartView,CustomTokenRefreshView
+    AdminReportViewSet, CartItemViewSet, CheckoutView, OrderViewSet,EmptyCartView,CustomTokenRefreshView,CheckIsAuthenticated
 )
 
 router = DefaultRouter()
@@ -24,9 +24,11 @@ router.register(r'admin/users', AdminUserViewSet, basename='admin-user')
 router.register(r'admin/products', AdminProductViewSet, basename='admin-product')
 router.register(r'admin/reports', AdminReportViewSet, basename='admin-report')
 
+
 urlpatterns = [
     # Authentication & Profile endpoints
     path('auth/register', RegisterView.as_view(), name='register'),
+    path('auth/is-authenticated', CheckIsAuthenticated.as_view(), name='is_authenticated'),
     path('auth/login', LoginView.as_view(), name='login'),
     path('auth/logout', LogoutView.as_view(), name='logout'),
     path('auth/password-reset', PasswordResetView.as_view(), name='password_reset'),

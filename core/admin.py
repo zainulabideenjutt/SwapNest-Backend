@@ -89,7 +89,7 @@ class CartAdmin(admin.ModelAdmin):
 
 @admin.register(CartItem)
 class CartItemAdmin(admin.ModelAdmin):
-    list_display = ('id', 'cart', 'product', 'quantity', 'created_at')
+    list_display = ('id', 'cart', 'product', 'created_at')
     search_fields = ('cart__user__username', 'product__title')
     ordering = ('-created_at',)
 
@@ -102,6 +102,6 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
-    list_display = ('id', 'order', 'product', 'quantity', 'price')
+    list_display = ('id', 'order', 'product', 'price')
     search_fields = ('order__id', 'product__title')
     ordering = ('id',)

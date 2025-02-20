@@ -185,7 +185,7 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CartItem
-        fields = ['id', 'product', 'product_id', 'quantity', 'created_at']
+        fields = ['id', 'product', 'product_id', 'created_at']
         read_only_fields = ['id', 'product', 'created_at']
 
     def validate_product(self, value):

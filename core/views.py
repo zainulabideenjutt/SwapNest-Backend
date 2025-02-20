@@ -629,3 +629,12 @@ class AdminReportViewSet(viewsets.ModelViewSet):
     serializer_class = ReportSerializer
     permission_classes = [IsAdminUser]
     queryset = Report.objects.all()
+
+class CheckIsAuthenticated(APIView):
+    """
+    Check if user is authenticated.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({"success": true})
