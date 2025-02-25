@@ -18,7 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
- 
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-rd0g^8m39731l&9&yiok=f41v#ngx1*_+f9-&2mfw!10xqa0h3'
 
@@ -45,13 +45,14 @@ INSTALLED_APPS = [
     'core',
 ]
 
-DB_USERNAME =os.environ.get("POSTGRES_USER")
-DB_PASSWORD =os.environ.get("POSTGRES_PASSWORD")
-DB_HOST =os.environ.get("POSTGRES_HOST")
-DB_PORT =os.environ.get("POSTGRES_PORT")
-DB_DATABASE =os.environ.get("POSTGRES_DB")
+DB_USERNAME = os.environ.get("POSTGRES_USER")
+DB_PASSWORD = os.environ.get("POSTGRES_PASSWORD")
+DB_HOST = os.environ.get("POSTGRES_HOST")
+DB_PORT = os.environ.get("POSTGRES_PORT")
+DB_DATABASE = os.environ.get("POSTGRES_DB")
 POSTGRES_READY = str(os.environ.get("POSTGRES_READY")) == 1
-DB_IS_AVAILABLE=all([DB_USERNAME,DB_DATABASE,DB_HOST,DB_PASSWORD,DB_PORT])
+DB_IS_AVAILABLE = all(
+    [DB_USERNAME, DB_DATABASE, DB_HOST, DB_PASSWORD, DB_PORT])
 
 if DB_IS_AVAILABLE and POSTGRES_READY:
     DATABASES = {
@@ -75,7 +76,6 @@ if DB_IS_AVAILABLE and POSTGRES_READY:
     }
 
 
-
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'core.authentication.CookiesJWTAuthentication',
@@ -86,7 +86,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=0.1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
@@ -134,6 +134,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.middleware.TokenRefreshMiddleware',
 ]
 
 ROOT_URLCONF = 'SwapNest.urls'
@@ -218,4 +219,4 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
-CORS_ALLOW_CREDENTIALS= True
+CORS_ALLOW_CREDENTIALS = True

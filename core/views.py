@@ -29,10 +29,12 @@ import os
 # ---------------------------------------------------
 # Authentication Related Views
 # ---------------------------------------------------
+
+
 class RegisterView(generics.CreateAPIView):
     """
     Allow new users to register.
-    
+
     This view handles user registration by creating new user accounts.
     It uses the UserSerializer to validate and create user records.
     """
@@ -68,7 +70,8 @@ class CustomTokenRefreshView(TokenRefreshView):
                 samesite='None',
                 path='/'
             )
-            res.data.update({'access_token': access_token, 'refresh_token': refresh_token})
+            res.data.update({'access_token': access_token,
+                            'refresh_token': refresh_token})
             return res
         except Exception as e:
             return Response({'refreshed': False, "error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
@@ -77,13 +80,13 @@ class CustomTokenRefreshView(TokenRefreshView):
 class LoginView(APIView):
     """
     Authenticate user credentials and issue JWT tokens.
-    
+
     Endpoints:
     - POST: Accepts email and password, returns JWT tokens if valid.
     - Sets httponly cookie with access token for enhanced security.
     """
     permission_classes = []
-    
+
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
@@ -95,12 +98,14 @@ class LoginView(APIView):
         user = authenticate(email=email, password=password)
         if user is None:
             return Response(
-                {"error": "Authentication Failed", "detail": "Incorrect email or password. Please try again."},
+                {"error": "Authentication Failed",
+                    "detail": "Incorrect email or password. Please try again."},
                 status=status.HTTP_401_UNAUTHORIZED
             )
         if not user.is_active:
             return Response(
-                {"error": "Account Inactive", "detail": "Your account is currently inactive. Please contact support."},
+                {"error": "Account Inactive",
+                    "detail": "Your account is currently inactive. Please contact support."},
                 status=status.HTTP_403_FORBIDDEN
             )
         refresh = RefreshToken.for_user(user)
@@ -111,21 +116,22 @@ class LoginView(APIView):
             "refresh_token": str(refresh),
             "user": UserSerializer(user).data,
         }, status=status.HTTP_200_OK)
-        response.set_cookie(key='access_token', value=access_token, httponly=True,secure=True,samesite='None',
-                path='/')
-        response.set_cookie(key='refresh_token', value=str(refresh), httponly=True ,secure=True,samesite='None')
+        response.set_cookie(key='access_token', value=access_token, httponly=True, secure=True, samesite='None',
+                            path='/')
+        response.set_cookie(key='refresh_token', value=str(
+            refresh), httponly=True, secure=True, samesite='None')
         return response
 
 
 class LogoutView(APIView):
     """
     Log out the user by clearing the JWT cookie.
-    
+
     Endpoints:
     - POST: Clears the access token cookie and logs out the user.
     """
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         response = Response(
             {"detail": "You have been logged out successfully."},
@@ -139,12 +145,13 @@ class LogoutView(APIView):
 class PasswordResetView(APIView):
     """Dummy password reset endpoint."""
     permission_classes = [AllowAny]
-    
+
     def post(self, request):
         email = request.data.get('email')
         if not email:
             return Response(
-                {"error": "Bad Request", "detail": "Email is required for password reset."},
+                {"error": "Bad Request",
+                    "detail": "Email is required for password reset."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         # In a production system, send the reset instructions.
@@ -169,13 +176,13 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 class ProductViewSet(viewsets.ModelViewSet):
     """
     CRUD operations for products.
-    
+
     Features:
     - Filters products by title, category, price range, location, and condition.
     - Excludes sold products and user's own listings (except for admins).
     - Only owners and admins can update/delete products.
     - Soft deletion by setting is_active=False.
-    
+
     Endpoints:
     - GET: List products with optional filters.
     - POST: Create new product.
@@ -184,9 +191,10 @@ class ProductViewSet(viewsets.ModelViewSet):
     """
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
-        queryset = Product.objects.filter(is_sold=False, is_active=True).select_related('category', 'seller')
+        queryset = Product.objects.filter(
+            is_sold=False, is_active=True).select_related('category', 'seller')
         title = self.request.query_params.get('title')
         category = self.request.query_params.get('category')
         min_price = self.request.query_params.get('min_price')
@@ -208,40 +216,41 @@ class ProductViewSet(viewsets.ModelViewSet):
         if self.request.user.role != 'Admin':
             queryset = queryset.exclude(seller=self.request.user)
         return queryset
-    
+
     def create(self, request, *args, **kwargs):
         # Extract base64 images from request data
         base64_images = request.data.pop('images', [])
-        
+
         # Create the product first
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         product = serializer.save(seller=self.request.user)
-        
+
         # Process and save images
         for index, base64_image in enumerate(base64_images):
             try:
                 # Extract the base64 data
                 format, imgstr = base64_image.split(';base64,')
                 ext = format.split('/')[-1]
-                
+
                 # Generate unique filename
                 filename = f"{uuid.uuid4()}.{ext}"
-                
+
                 # Create the media directory if it doesn't exist
-                media_path = os.path.join(settings.MEDIA_ROOT, 'product_images')
+                media_path = os.path.join(
+                    settings.MEDIA_ROOT, 'product_images')
                 os.makedirs(media_path, exist_ok=True)
-                
+
                 # Save the image file
                 file_path = os.path.join(media_path, filename)
                 with open(file_path, 'wb') as f:
                     f.write(base64.b64decode(imgstr))
 
-                host_url = request.build_absolute_uri('/')[:-1] 
-                
+                host_url = request.build_absolute_uri('/')[:-1]
+
                 # Create image URL
                 image_url = f"{host_url}{settings.MEDIA_URL}product_images/{filename}"
-                
+
                 # Create ProductImage instance
                 ProductImage.objects.create(
                     product=product,
@@ -259,16 +268,18 @@ class ProductViewSet(viewsets.ModelViewSet):
         product = self.get_object()
         if product.seller != request.user and request.user.role != 'Admin':
             return Response(
-                {"error": "Unauthorized", "detail": "You are not authorized to update this product because you are not its owner."},
+                {"error": "Unauthorized",
+                    "detail": "You are not authorized to update this product because you are not its owner."},
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().update(request, *args, **kwargs)
-    
+
     def destroy(self, request, *args, **kwargs):
         product = self.get_object()
         if product.seller != request.user and request.user.role != 'Admin':
             return Response(
-                {"error": "Unauthorized", "detail": "You are not authorized to delete this product because you are not its owner."},
+                {"error": "Unauthorized",
+                    "detail": "You are not authorized to delete this product because you are not its owner."},
                 status=status.HTTP_403_FORBIDDEN
             )
         product.is_active = False
@@ -286,14 +297,15 @@ class ProductImageViewSet(viewsets.ModelViewSet):
     """
     serializer_class = ProductImageSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         return ProductImage.objects.all()
-    
+
     def perform_create(self, serializer):
         product = serializer.validated_data.get('product')
         if product.seller != self.request.user and self.request.user.role != 'Admin':
-            raise PermissionDenied("You are only allowed to add images to your own products.")
+            raise PermissionDenied(
+                "You are only allowed to add images to your own products.")
         serializer.save()
 
 
@@ -312,32 +324,33 @@ class CategoryViewSet(viewsets.ModelViewSet):
 class TransactionViewSet(viewsets.ModelViewSet):
     """
     Manage buying and selling transactions.
-    
+
     Features:
     - Users can view their transactions as buyer or seller.
     - Admins can view all transactions.
     - Automatically records transaction details during checkout.
-    
+
     Endpoints:
     - GET: List user's transactions.
     - POST: Create new transaction (usually via checkout).
     """
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         user = self.request.user
         if user.role == 'Admin':
             return Transaction.objects.all()
         return Transaction.objects.filter(Q(buyer=user) | Q(seller=user))
-    
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         product = serializer.validated_data.get('product')
         if not product.is_active:
             return Response(
-                {"error": "Product Unavailable", "detail": "This product is not available for purchase."},
+                {"error": "Product Unavailable",
+                    "detail": "This product is not available for purchase."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         serializer.save(
@@ -361,20 +374,21 @@ class ReportViewSet(viewsets.ModelViewSet):
     """
     serializer_class = ReportSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         user = self.request.user
         if user.role == 'Admin':
             return Report.objects.all()
         return Report.objects.filter(reporter=user)
-    
+
     def perform_create(self, serializer):
         serializer.save(reporter=self.request.user)
-    
+
     def update(self, request, *args, **kwargs):
         if request.user.role != 'Admin':
             return Response(
-                {"error": "Unauthorized", "detail": "Only administrators can update report statuses."},
+                {"error": "Unauthorized",
+                    "detail": "Only administrators can update report statuses."},
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().update(request, *args, **kwargs)
@@ -389,11 +403,11 @@ class ConversationViewSet(viewsets.ModelViewSet):
     """
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         user = self.request.user
         return Conversation.objects.filter(participants=user)
-    
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -413,11 +427,11 @@ class MessageViewSet(viewsets.ModelViewSet):
     """
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         user = self.request.user
         return Message.objects.filter(conversation__participants=user)
-    
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -439,12 +453,12 @@ class MessageViewSet(viewsets.ModelViewSet):
 class CartItemViewSet(viewsets.ModelViewSet):
     """
     Manage shopping cart items.
-    
+
     Features:
     - Automatically creates cart for new users.
     - Prevents duplicate products in cart.
     - Associates items with user's cart.
-    
+
     Endpoints:
     - GET: List cart items.
     - POST: Add item to cart.
@@ -452,11 +466,11 @@ class CartItemViewSet(viewsets.ModelViewSet):
     """
     serializer_class = CartItemSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         cart, _ = Cart.objects.get_or_create(user=self.request.user)
         return cart.items.all()
-    
+
     def create(self, request, *args, **kwargs):
         cart, _ = Cart.objects.get_or_create(user=self.request.user)
         product_id = request.data.get('product_id')
@@ -468,11 +482,12 @@ class CartItemViewSet(viewsets.ModelViewSet):
         # Check for duplicate items using the improved Product model's primary key field: id.
         if cart.items.filter(product__id=product_id).exists():
             return Response(
-                {"error": "Duplicate Item", "detail": "This product is already in your cart."},
+                {"error": "Duplicate Item",
+                    "detail": "This product is already in your cart."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         return super().create(request, *args, **kwargs)
-    
+
     def perform_create(self, serializer):
         cart, _ = Cart.objects.get_or_create(user=self.request.user)
         serializer.save(cart=cart)
@@ -483,7 +498,7 @@ class EmptyCartView(APIView):
     Empty your cart by deleting all cart items.
     """
     permission_classes = [IsAuthenticated]
-    
+
     def delete(self, request):
         cart, _ = Cart.objects.get_or_create(user=self.request.user)
         cart.items.all().delete()
@@ -501,40 +516,44 @@ class OrderViewSet(viewsets.ModelViewSet):
     """
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         user = self.request.user
         if user.role == 'Admin':
             return Order.objects.all()
         return Order.objects.filter(user=user)
-    
+
     def create(self, request, *args, **kwargs):
         # Typically orders are created via checkout.
         return Response(
-            {"error": "Method Not Allowed", "detail": "Orders must be created via the checkout process."},
+            {"error": "Method Not Allowed",
+                "detail": "Orders must be created via the checkout process."},
             status=status.HTTP_405_METHOD_NOT_ALLOWED
         )
-    
+
     def update(self, request, *args, **kwargs):
         if request.user.role != 'Admin':
             return Response(
-                {"error": "Unauthorized", "detail": "Only administrators can update orders."},
+                {"error": "Unauthorized",
+                    "detail": "Only administrators can update orders."},
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().update(request, *args, **kwargs)
-    
+
     def partial_update(self, request, *args, **kwargs):
         if request.user.role != 'Admin':
             return Response(
-                {"error": "Unauthorized", "detail": "Only administrators can update orders."},
+                {"error": "Unauthorized",
+                    "detail": "Only administrators can update orders."},
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().partial_update(request, *args, **kwargs)
-    
+
     def destroy(self, request, *args, **kwargs):
         if request.user.role != 'Admin':
             return Response(
-                {"error": "Unauthorized", "detail": "Only administrators can delete orders."},
+                {"error": "Unauthorized",
+                    "detail": "Only administrators can delete orders."},
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().destroy(request, *args, **kwargs)
@@ -543,14 +562,14 @@ class OrderViewSet(viewsets.ModelViewSet):
 class CheckoutView(APIView):
     """
     Process checkout from shopping cart.
-    
+
     Features:
     - Validates sufficient balance.
     - Creates order and transactions.
     - Updates user balances.
     - Marks products as sold.
     - Clears cart after successful checkout.
-    
+
     Process flow:
     1. Validate cart contents and user balance.
     2. Create order record.
@@ -558,80 +577,111 @@ class CheckoutView(APIView):
     4. Create transactions.
     5. Update product status.
     6. Clear cart.
-    
+
     Security:
     - Prevents self-purchase of products.
     - Uses atomic transactions for data consistency.
     """
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         cart, _ = Cart.objects.get_or_create(user=request.user)
-        cart_items = cart.items.select_related('product', 'product__seller').all()
+        cart_items = cart.items.select_related(
+            'product', 'product__seller').all()
         if not cart_items.exists():
             return Response(
-                {"error": "Empty Cart", "detail": "Your cart is empty. Please add products before checking out."},
+                {"error": "Empty Cart",
+                    "detail": "Your cart is empty. Please add products before checking out."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Validate: Ensure you are not purchasing your own products.
-        invalid_items = [item for item in cart_items if item.product.seller == request.user]
+
+        # Validate: Check if any products are already sold
+        sold_items = [item for item in cart_items if item.product.is_sold]
+        if sold_items:
+            titles = ", ".join([item.product.title for item in sold_items])
+            return Response(
+                {"error": "Products Unavailable",
+                    "detail": f"The following products are no longer available: {titles}. Please remove them from your cart."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate: Ensure you are not purchasing your own products
+        invalid_items = [
+            item for item in cart_items if item.product.seller.username == request.user.username]
         if invalid_items:
             titles = ", ".join([item.product.title for item in invalid_items])
             return Response(
-                {"error": "Self Purchase Not Allowed", "detail": f"You cannot purchase your own products: {titles}. Please remove these items from your cart."},
+                {"error": "Self Purchase Not Allowed",
+                    "detail": f"You cannot purchase your own products: {titles}. Please remove these items from your cart."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        total = sum(item.product.price * item.quantity for item in cart_items)
+
+        # Calculate total considering product prices
+        total = sum(float(item.product.price) for item in cart_items)
         if request.user.balance < total:
             return Response(
-                {"error": "Insufficient Funds", "detail": "Your balance is insufficient to complete the purchase. Please add funds or remove items from your cart."},
+                {"error": "Insufficient Funds",
+                    "detail": f"Your balance (${request.user.balance:.2f}) is insufficient for this purchase (${total:.2f}). Please add funds or remove items from your cart."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         with transaction.atomic():
-            # Deduct the total from the buyer's balance.
+            # Deduct the total from the buyer's balance
             request.user.balance = F('balance') - total
             request.user.save()
-            
-            # Create the order.
-            order = Order.objects.create(user=request.user, total=total, status='Pending')
-            
-            for item in cart_items:
+
+            # Create the order
+            order = Order.objects.create(
+                user=request.user,
+                total=total,
+                status='Completed'  # Changed from 'Pending' to 'Completed' since payment is immediate
+            )
+
+            # Process each cart item
+            for cart_item in cart_items:
+                product = cart_item.product
+                seller = product.seller
+                item_price = float(product.price)
+
+                # Create order item
                 OrderItem.objects.create(
                     order=order,
-                    product=item.product,
-                    quantity=item.quantity,
-                    price=item.product.price
+                    product=product,
+                    price=item_price
                 )
-                seller = item.product.seller
-                seller.balance = F('balance') + (item.product.price * item.quantity)
+
+                # Update seller's balance
+                seller.balance = F('balance') + item_price
                 seller.save()
-                
-                product = item.product
+
+                # Update product status
                 product.is_sold = True
+                product.is_active = False
                 product.bought_by = request.user
                 product.save()
-                
+
+                # Create transaction record
                 Transaction.objects.create(
                     product=product,
                     buyer=request.user,
                     seller=seller,
                     payment_method="Balance",
-                    amount=product.price * item.quantity,
+                    amount=item_price,
                     transaction_status='Successful'
                 )
-            
-            # Clear the cart.
+
+            # Clear the cart
             cart.items.all().delete()
             request.user.refresh_from_db()
-            
+
+            # Prepare response with order details
             order_serializer = OrderSerializer(order)
-            return Response(
-                {"detail": "Your order has been placed successfully.", "order": order_serializer.data},
-                status=status.HTTP_201_CREATED
-            )
+            return Response({
+                "detail": "Your order has been placed successfully.",
+                "order": order_serializer.data,
+                "total_paid": f"${total:.2f}",
+                "remaining_balance": f"${request.user.balance:.2f}"
+            }, status=status.HTTP_201_CREATED)
 
 
 # ---------------------------------------------------
@@ -640,7 +690,7 @@ class CheckoutView(APIView):
 class AdminUserViewSet(viewsets.ModelViewSet):
     """
     Admin-only endpoints for user management.
-    
+
     Features:
     - Full CRUD access to user accounts.
     - Restricted to admin users only.
@@ -654,7 +704,7 @@ class AdminUserViewSet(viewsets.ModelViewSet):
 class AdminProductViewSet(viewsets.ModelViewSet):
     """
     Admin-only endpoints for product management.
-    
+
     Features:
     - Override user restrictions.
     - Access to all products including inactive.
@@ -668,7 +718,7 @@ class AdminProductViewSet(viewsets.ModelViewSet):
 class AdminReportViewSet(viewsets.ModelViewSet):
     """
     Admin-only endpoints for report management.
-    
+
     Features:
     - Access to all user reports.
     - Can update report status.
@@ -678,6 +728,7 @@ class AdminReportViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminUser]
     queryset = Report.objects.all()
 
+
 class CheckIsAuthenticated(APIView):
     """
     Check if user is authenticated.
@@ -685,4 +736,5 @@ class CheckIsAuthenticated(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response({"success": true})
+
+        return Response({"success": True, "user": request.user.username})
