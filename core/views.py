@@ -163,7 +163,6 @@ class PasswordResetView(APIView):
 
 class ProfileView(generics.RetrieveUpdateAPIView):
     """Retrieve or update the current user's profile."""
-    permission_classes = [IsAuthenticated]
     serializer_class = UserSerializer
 
     def get_object(self):
